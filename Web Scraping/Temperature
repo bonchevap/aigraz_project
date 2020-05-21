@@ -1,0 +1,92 @@
+!pip install selenium
+!apt-get update # to update ubuntu to correctly run apt install
+!apt install chromium-chromedriver
+!cp /usr/lib/chromium-browser/chromedriver /usr/bin
+import time
+import datetime
+from bs4 import BeautifulSoup
+import requests, sys, re
+sys.path.insert(0,'/usr/lib/chromium-browser/chromedriver')
+from selenium import webdriver
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+driver = webdriver.Chrome('chromedriver',chrome_options=chrome_options)
+from google.colab import files
+
+year_start = 2015
+year_end = 2020
+
+for year in range(year_start,year_end):
+  out_file = open(str(year)+'.csv', 'w')
+  print(year)
+  url = 'https://www.wunderground.com/history/daily/mk/ilinden-municipality/LWSK/date/2016-1-1'
+
+  driver.get(url)
+  time.sleep(3)
+  sopa = BeautifulSoup(driver.page_source, 'lxml')
+  #driver.quit()
+
+  tables = sopa.find_all('table', {"class": "mat-table"})
+
+  # Write all the tables into csv files:
+  for table in tables:
+    
+    thead = table.find_all('thead')
+    for h in thead:
+      # ---- Write the table header: ----
+      table_head = h.find_all('th')
+      output_head = []
+      for head in table_head:
+          output_head.append(head.text.strip())
+
+      # Some cleaning and formatting of the text before writing:
+      encabezado = '"' + '";"'.join(output_head) + '"'
+      encabezado = re.sub('\s', '', encabezado) + '\n'
+      encabezado = ''.join(('"Date";',encabezado))
+      out_file.write(encabezado)
+
+  for month in range(1,13):
+    print(month)
+    for day in range(1,32):
+      isValidDate = True
+      try :
+        datetime.datetime(int(year),int(month),int(day))
+      except ValueError :
+        isValidDate = False
+      if(isValidDate) :
+        print(day)
+        url = 'https://www.wunderground.com/history/daily/mk/ilinden-municipality/LWSK/date/'+str(year)+'-'+str(month)+'-'+str(day)
+
+        driver.get(url)
+        time.sleep(6)
+        sopa = BeautifulSoup(driver.page_source, 'lxml')
+        #driver.quit()
+
+        tables = sopa.find_all('table', {"class": "mat-table"})
+
+        # Write all the tables into csv files:
+        for table in tables:
+
+          # ---- Write the rows: ----
+          tbody = table.find_all('tbody')
+          for b in tbody:
+            output_rows = []
+            filas = b.findAll('tr')
+            for j in filas:
+              table_row = j
+              columns = table_row.findAll('td')
+              output_row = []
+              for column in columns:
+                  output_row.append(column.text.strip())
+
+              # Some cleaning and formatting of the text before writing:
+              fila = '"' + '";"'.join(output_row) + '"'
+              fila = re.sub('\s', '', fila) + '\n'
+              fila = ''.join(('"'+str(year)+'-'+str(month)+'-'+str(day)+'";',fila))
+              out_file.write(fila)
+  
+  out_file.close()
+
+driver.quit()
